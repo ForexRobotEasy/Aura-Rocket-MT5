@@ -1,0 +1,102 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                                Aura Rocket MT5   |
+//|                          Developed by forexroboteasy.com         |
+//|                                       Forex Robot Easy Team       |
+//+------------------------------------------------------------------+
+
+// Include necessary libraries and define constants
+#include <Trade\Trade.mqh>
+#include <Neuro\Neuro.mqh>
+#include <Indicators\Trend.mqh>
+#include <Indicators\StopLoss.mqh>
+#include <Optimization\HyperparameterSearch.mqh>
+
+// Define global variables
+CTrade trade; // Trade object
+CNeuro mlp; // Multilayer Perceptron
+CTrend trend; // Trend indicator
+CStopLoss stopLoss; // Stop loss mechanism
+CHyperparameterSearch hyperparameterSearch; // Hyperparameter search
+
+// Initialize expert advisor
+int OnInit()
+{
+    // Set up trade parameters
+    trade.SetDeviationInPoints(10);
+    trade.SetType(ORDER_TYPE_BUY | ORDER_TYPE_SELL);
+    
+    // Initialize Multilayer Perceptron
+    mlp.Init(10, 3, 1); // Set up MLP with 10 input neurons, 3 hidden neurons, and 1 output neuron
+    mlp.SetLearningRate(0.001);
+    mlp.SetMomentum(0.9);
+    
+    // Initialize indicators
+    trend.Init(Symbol(), PERIOD_H1);
+    stopLoss.Init(100, 50, SYMBOL_TRADE_STOPS_LEVEL);
+    
+    // Set up hyperparameter search
+    hyperparameterSearch.SetMaxIterations(1000);
+    hyperparameterSearch.SetPopulationSize(50);
+    
+    return(INIT_SUCCEEDED);
+}
+
+// Start expert advisor
+void OnTick()
+{
+    // Check if there is a new bar
+    if (trend.IsNewBar())
+    {
+        // Get current trend direction
+        ENUM_DIRECTION trendDirection = trend.GetDirection();
+        
+        // Check if the trend is up
+        if (trendDirection == DIRECTION_UP)
+        {
+            // Generate entry signal using multilayer perceptron
+            double entrySignal = mlp.FeedForward(trend.GetLastXBars(10));
+            
+            // Check if the entry signal is above a certain threshold
+            if (entrySignal > 0.8)
+            {
+                // Open a buy order
+                trade.Buy(0.1, Symbol(), Ask, stopLoss.GetLevel());
+            }
+        }
+        // Check if the trend is down
+        else if (trendDirection == DIRECTION_DOWN)
+        {
+            // Generate entry signal using multilayer perceptron
+            double entrySignal = mlp.FeedForward(trend.GetLastXBars(10));
+            
+            // Check if the entry signal is below a certain threshold
+            if (entrySignal < -0.8)
+            {
+                // Open a sell order
+                trade.Sell(0.1, Symbol(), Bid, stopLoss.GetLevel());
+            }
+        }
+    }
+}
+
+// Stop expert advisor
+void OnDeinit(const int reason)
+{
+    // Cleanup
+    mlp.Deinit();
+    trend.Deinit();
+    stopLoss.Deinit();
+}
+
+// Optimize expert advisor
+void OnOptimization()
+{
+    // Set up hyperparameter search space
+    hyperparameterSearch.AddParameter(mlp.GetLearningRate(), 0.001, 0.01, 0.001);
+    hyperparameterSearch.AddParameter(mlp.GetMomentum(), 0.5, 0.9, 0.1);
+    
+    // Start hyperparameter search
+    hyperparameterSearch.Start();
+}
+
